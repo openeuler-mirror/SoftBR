@@ -8,7 +8,7 @@ add_compile_options("-w")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -g")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g")
-set(LOG_LEVEL "LOG_NONE" CACHE STRING "set the log level");
+set(LOG_LEVEL "LOG_NONE" CACHE STRING "set the log level")
 add_definitions( -DLOG_LEVEL=${LOG_LEVEL})
 # add_definitions( -D LOG_LEVEL=LOG_NONE)
 # add_definitions( -D MY_DEBUG)
