@@ -19,7 +19,7 @@ file(GLOB SOURCES "src/engine/*.cpp" "src/utils/*.cpp")
 add_library(profiler SHARED ${SOURCES})
 
 
-target_include_directories(profiler PUBLIC ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/include/log ${PROJECT_SOURCE_DIR}/third_party/DynamoRIO/include) 
+target_link_libraries(profiler PRIVATE pthread ${PROJECT_SOURCE_DIR}/third_party/DynamoRIO/lib64/release/libdynamorio_static.a unwind unwind-generic)
 
 add_subdirectory(third_party)
 link_directories(${PROJECT_SOURCE_DIR}/third_party/DynamoRIO/lib64/debug)
