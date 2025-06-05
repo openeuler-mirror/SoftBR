@@ -30,18 +30,13 @@ private:
   {
     unw_tdep_context_t *context = reinterpret_cast<unw_tdep_context_t *>(&context_);
 #if defined(__aarch64__)
-#include <sys/ucontext.h>
-    const ucontext_t *uc = reinterpret_cast<const ucontext_t *>(sigcontext);
-    //memcpy(context, uc, sizeof(ucontext_t)); 
-    context->uc_link = uc->uc_link;
-    context->uc_stack = uc->uc_stack;
-    context->uc_sigmask = uc->uc_sigmask;
-    context->uc_mcontext.fault_address = uc->uc_mcontext.fault_address;
-    context->uc_mcontext.sp = uc->uc_mcontext.sp;
-    context->uc_mcontext.pc = uc->uc_mcontext.pc;
-    context->uc_mcontext.pstate = uc->uc_mcontext.pstate;
-    std::memcpy(context->uc_mcontext.regs, uc->uc_mcontext.regs, sizeof(uc->uc_mcontext.regs));
-    std::memcpy(context->uc_mcontext.__reserved, uc->uc_mcontext.__reserved, 4096 * sizeof(char));
+		const ucontext_t *uc = reinterpret_cast<const ucontext_t *>(sigcontext);
+		// Copy all general purpose registers (x0-x28)
+		for (int i = 0; i < 31; i++) {
+			context->uc_mcontext.regs[i] = uc->uc_mcontext.regs[i];
+		}
+		context->uc_mcontext.sp = uc->uc_mcontext.sp; // SP
+		context->uc_mcontext.pc = uc->uc_mcontext.pc; // PC
 #elif defined(__x86_64__)
 #include <sys/ucontext.h>
     typedef struct ucontext ucontext_t;
