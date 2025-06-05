@@ -23,7 +23,7 @@ target_include_directories(profiler PUBLIC ${PROJECT_SOURCE_DIR}/include ${PROJE
 
 add_subdirectory(third_party)
 link_directories(${PROJECT_SOURCE_DIR}/third_party/DynamoRIO/lib64/debug)
-target_link_libraries(profiler PRIVATE pthread ${PROJECT_SOURCE_DIR}/third_party/DynamoRIO/lib64/release/libdynamorio.so unwind unwind-generic)
+target_link_libraries(profiler PRIVATE pthread ${PROJECT_SOURCE_DIR}/third_party/DynamoRIO/lib64/release/libdynamorio_static.a unwind unwind-generic)
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
     add_definitions(-D__x86_64__)
