@@ -21,6 +21,10 @@ void ThreadContext::init_perf_breakpoint_event(int &threadState) {
     pe.disabled = 1;
     pe.exclude_kernel = 1;
     assert(this->bp_fd_ == -1 && "previous breakpoint events must be closed");
+    if (kill(tid_, 0) == -1) {
+        ERROR("%d is dead", tid_);
+        return;
+    }
     if ((this->bp_fd_ = syscall(__NR_perf_event_open, &pe, tid_, -1, -1, 0)) < 0) {
         ERROR("perf_event_open");
         ERROR("no left breakpoint");

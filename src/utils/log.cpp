@@ -9,6 +9,11 @@
 #include <time.h>
 
 void initLogFile() {
+#ifdef LOG_LEVEL
+    if (LOG_LEVEL == LogLevel::LOG_NONE) {
+        return;
+    }
+#endif
     logFd = open("profiler.log", O_WRONLY | O_TRUNC | O_CREAT, 0644);
     if (logFd == -1) {
         perror("Failed to open log file");
