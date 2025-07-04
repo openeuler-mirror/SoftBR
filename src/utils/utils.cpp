@@ -16,6 +16,9 @@
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <unordered_set>
+#include <elf.h>
+#include <sys/stat.h>
+#include <iomanip>
 
 #if defined(__x86_64__)
 #include <libunwind-x86_64.h>
@@ -24,6 +27,8 @@
 #endif
 
 #define X86
+
+std::vector<mmap_info> mmap_list;
 
 long perf_event_open(struct perf_event_attr *event_attr, pid_t pid, int cpu, int group_fd, unsigned long flags)
 {
@@ -128,15 +133,29 @@ std::pair<uint64_t, bool> check_branch_if_taken(ThreadContext &tcontext, ucontex
 
   }
 
-std::string parseMapsLine(const std::string& line, pid_t pid) {
+mmap_info parseMapsLine(const std::string& line, pid_t pid) {
   std::istringstream iss(line);
 
   std::string address_range, permissions, offset, device, inode, pathname;
 
   iss >> address_range >> permissions >> offset >> device >> inode >> pathname;
 
-  if (permissions != "r-xp") {
-    return "";
+  uint32_t prot = 0;
+  uint32_t flags = 0;
+
+  if (permissions[0] == 'r') {
+    prot |= PROT_READ;
+  }
+  if (permissions[1] == 'w') {
+    prot |= PROT_WRITE;
+  }
+  if (permissions[2] == 'x') {
+    prot |= PROT_EXEC;
+  }
+  if (permissions[3] == 'p') {
+    flags |= MAP_PRIVATE;
+  } else {
+    flags |= MAP_SHARED;
   }
 
   size_t dash_pos = address_range.find('-');
@@ -152,26 +171,24 @@ std::string parseMapsLine(const std::string& line, pid_t pid) {
   std::string minor = device.substr(colon_pos + 1);
 
   unsigned long offset_value = std::stoul(offset, nullptr, 16);
-  std::string offset_string;
+  
+  mmap_info mmap = {
+    .addr = start_addr,
+    .len = size,
+    .pgoff = offset_value,
+    .maj = static_cast<uint32_t>(std::stoul(major, nullptr, 16)),
+    .min = static_cast<uint32_t>(std::stoul(minor, nullptr, 16)),
+    .ino = std::stoul(inode),
+    .ino_generation = 0,
+    .prot = prot,
+    .flags = flags,
+    .filename = pathname,
+  };
 
-  if (offset_value == 0) {
-    offset_string = "0";
-  } else {
-    std::ostringstream oss;
-    oss << "0x" << std::hex << offset_value;
-    offset_string = oss.str();
-  }
-
-  std::ostringstream oss;
-
-  oss << "PERF_RECORD_MMAP2 " << pid << "/" << pid << ": "
-      << "[0x" << start_address << "(0x" <<  std::hex << size << ") @ " << offset_string << " "
-      << major << ":" << minor << " " << inode << " 0]: " << permissions << " " << pathname;
-
-  return oss.str();
+  return mmap;
 }
 
-void get_mmap(pid_t pid, std::ostream &os) {
+void get_mmap(pid_t pid) {
   std::string path_maps = "/proc/" + std::to_string(pid) + "/maps";
   std::ifstream file_maps(path_maps);
 
@@ -184,13 +201,78 @@ void get_mmap(pid_t pid, std::ostream &os) {
 
   while (std::getline(file_maps, line))
   {
-    std::string perf_record = parseMapsLine(line, pid);
-    if (perf_record.empty()) {
+    mmap_info mmap = parseMapsLine(line, pid);
+    if (!(mmap.prot & PROT_EXEC)) {
       continue;
     }
-    os << perf_record << std::endl;
+    mmap_list.emplace_back(mmap);
   }
   file_maps.close();
+}
+
+void print_mmap(pid_t pid, std::ostream &os) {
+  for (const auto& mmap : mmap_list) {
+    std::string offset_string;
+
+    if (mmap.pgoff == 0) {
+      offset_string = "0";
+    } else {
+      std::ostringstream oss;
+      oss << "0x" << std::hex << mmap.pgoff;
+      offset_string = oss.str();
+    }
+
+    os << "PERF_RECORD_MMAP2 " << pid << "/" << pid << ": "
+       << "[0x" << std::hex << mmap.addr << "(0x" << mmap.len << ") @ " << offset_string << " "
+       << std::setfill('0') << std::setw(2) << mmap.maj << ":" << std::setw(2) << mmap.min << " "
+       << std::dec << mmap.ino << " " << mmap.ino_generation
+       << "]: " << "r-xp" << " " << mmap.filename << std::endl;
+  }
+}
+
+build_id get_buildid(const std::string &filename) {
+  FILE *file;
+  struct stat statbuf;
+  build_id bid = {};
+  Elf64_Ehdr *ehdr = 0;
+  Elf64_Phdr *phdr = 0;
+  Elf64_Nhdr *nhdr = 0;
+  if (!(file = fopen(filename.c_str(), "r"))){
+    return bid;
+  }
+  if (fstat(fileno(file), &statbuf) < 0) {
+    return bid;
+  }
+  ehdr = (Elf64_Ehdr *)mmap(0, statbuf.st_size, PROT_READ, MAP_PRIVATE, fileno(file), 0);
+  phdr = (Elf64_Phdr *)(ehdr->e_phoff + (size_t)ehdr);
+  size_t max_phdr = (size_t)phdr + ehdr->e_phnum * sizeof(Elf64_Phdr);
+  while (phdr->p_type != PT_NOTE) {
+    ++phdr;
+    if ((size_t)phdr >= max_phdr)
+      return bid;
+  }
+  nhdr = (Elf64_Nhdr *)(phdr->p_offset + (size_t)ehdr);
+  size_t max_nhdr = (size_t)nhdr + phdr->p_memsz;
+  while (nhdr->n_type != NT_GNU_BUILD_ID) {
+    nhdr = (Elf64_Nhdr *)((size_t)nhdr + sizeof(Elf64_Nhdr) + nhdr->n_namesz + nhdr->n_descsz);
+    if ((size_t)nhdr >= max_nhdr)
+      return bid;
+  }
+  memcpy(bid.data, (void *)((size_t)nhdr + sizeof(Elf64_Nhdr) + nhdr->n_namesz), nhdr->n_descsz);
+  bid.size = nhdr->n_descsz;
+  return bid;
+}
+
+void print_buildids(std::ostream &os) {
+  for (const auto& mmap : mmap_list) {
+    build_id bid = get_buildid(mmap.filename);
+    if (bid.size == 0)
+      continue;
+    for (int i = 0; i < bid.size; i++) {
+      os << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(bid.data[i]) << std::dec;
+    }
+    os << " " << mmap.filename << std::endl;
+  }
 }
 
 std::vector<pid_t> get_tids(pid_t target_pid, const std::vector<pid_t>& exclue_targets, std::size_t max_size)

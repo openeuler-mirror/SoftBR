@@ -17,7 +17,8 @@
 class BufferManager
 {
 public:
-    BufferManager(int num_threads, const std::string &output_path) : num_threads_(num_threads), stop_writer_(false)
+    BufferManager(int num_threads, const std::string &output_path, const std::string &buildid_path)
+    : num_threads_(num_threads), stop_writer_(false)
     {
        
 
@@ -25,6 +26,11 @@ public:
         if (!output_file.is_open())
         {
             ERROR("fail to init the output file");
+        }
+        buildid_file.open(buildid_path);
+        if (!buildid_file.is_open())
+        {
+            ERROR("fail to init the buildid file");
         }
     }
 
@@ -164,6 +170,7 @@ public:
     std::map<pid_t, std::shared_ptr<StackLBRBuffer>> bufferMap;
     std::vector<pid_t> tidsVector;
     std::ofstream output_file;
+    std::ofstream buildid_file;
 };
 
 #endif // BUFFER_MANAGER_H
