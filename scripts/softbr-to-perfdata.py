@@ -17,17 +17,18 @@ def parse_perf_script(input_file):
     mmap_pattern = re.compile(r"(PERF_RECORD_MMAP) (-?\d+)/(\d+): \[(0x[0-9a-f]+)\((0x[0-9a-f]+)\) @ ((?:0x)*[0-9a-f]+)\]: ([rx]) (.*)")
     mmap2_pattern = re.compile(r"(PERF_RECORD_MMAP2) (-?\d+)/(\d+): \[(0x[0-9a-f]+)\((0x[0-9a-f]+)\) @ ((?:0x)*[0-9a-f]+) ([0-9a-f]{2}):([0-9a-f]{2}) (\d+) (\d+)\]: ([r-])([w-])([x-])([sp]) (.*)")
     pid_pattern = re.compile("^\d+$")
-    callstack_pattern = re.compile("^\s*[0-9a-f]+$")
+    callchain_pattern = re.compile("^\s*[0-9a-f]+$")
 
     def line_parser():
         with open(input_file, 'r') as f:
             for line in f:
                 if pid_pattern.match(line):
                     pid = int(line)
-                    while (callstack_pattern.match(line := next(f, ''))):
-                        continue
+                    callchain = []
+                    while (callchain_pattern.match(line := next(f, ''))):
+                        callchain.append(int(line.strip(), 16))
                     if brstack_match := brstack_pattern.match(line):
-                        processed_brstack = pid, [
+                        processed_brstack = pid, callchain, [
                             (
                                 int(fromip, 16),
                                 int(toip, 16),
@@ -79,14 +80,14 @@ def build_attr():
     data += struct.pack('<I', 0x78)     # size
     data += struct.pack('<Q', 0)        # config
     data += struct.pack('<Q', 0)        # period/freq
-    data += struct.pack('<Q', 0x802)    # sample type
+    data += struct.pack('<Q', 0x803)    # sample type
     data += struct.pack('<Q', 0x4)      # read format
     data += struct.pack('<Q', 0x60902463)
     data += struct.pack('<I', 0)        # wakeup
     data += struct.pack('<I', 0)        # bp_type
     data += struct.pack('<Q', 0)
     data += struct.pack('<Q', 0)
-    data += struct.pack('<Q', 0x9)      # sample type
+    data += struct.pack('<Q', 0x9)      # branch sample type
     data += struct.pack('<Q', 0)        # sample_regs_user
     data += struct.pack('<I', 0)        # sample_stack_user
     data += struct.pack('<i', 0)        # clockid
@@ -99,18 +100,27 @@ def build_attr():
     return data
 
 def _pack_brstack_chunk(chunk):
-    header_fmt = struct.Struct('<IHHIIQ')
-    data_fmt = struct.Struct('<QQQ')
+    header_fmt = struct.Struct('<IHH')
+    ip_fmt =  struct.Struct('<Q')
+    pid_fmt = struct.Struct('<II')
+    brstack_fmt = struct.Struct('<QQQ')
+    nr_fmt = struct.Struct('<Q')
     buffer = []
-    for group in chunk:
-        header = header_fmt.pack(
-            0x9, 0x2,
-            8 + 8 + 4 + 4 + 24 * len(group[1]),
-            group[0], group[0],
-            len(group[1])
-        )
-        buffer.append(header)
-        buffer.extend(data_fmt.pack(fromip, toip, flags) for fromip, toip, flags in group[1])
+    _type = 0x9
+    _misc = 0x2
+    for pid, callchain, brstack in chunk:
+        # header + ip + pid + tid + nr + brstack
+        _size = 8 + 8 + 4 + 4 + 8 + 24 * len(brstack)
+        _header = header_fmt.pack(_type, _misc, _size)
+        _ip = ip_fmt.pack(callchain[0])
+        _pid = pid_fmt.pack(pid, pid)
+        _nr_brstack = nr_fmt.pack(len(brstack))
+        _brstack = (brstack_fmt.pack(fromip, toip, flags) for fromip, toip, flags in brstack)
+        buffer.append(_header)
+        buffer.append(_ip)
+        buffer.append(_pid)
+        buffer.append(_nr_brstack)
+        buffer.extend(_brstack)
     return b''.join(buffer)
 
 def build_brstack_parallel(brstack_items):
