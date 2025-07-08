@@ -21,9 +21,31 @@
 #include <iostream>
 #include <fstream>
 
-void get_mmap(pid_t pid, std::ostream &os);
+struct mmap_info {
+    uint64_t addr;
+    uint64_t len;
+    uint64_t pgoff;
+    uint32_t maj;
+    uint32_t min;
+    uint64_t ino;
+    uint64_t ino_generation;
+    uint32_t prot;
+    uint32_t flags;
+    std::string filename;
+};
 
-std::string parseMapsLine(const std::string& line, pid_t pid);
+struct build_id {
+    unsigned char data[20];
+    int size;
+};
+
+void get_mmap(pid_t pid);
+
+void print_mmap(pid_t pid, std::ostream &os);
+
+mmap_info parseMapsLine(const std::string& line, pid_t pid);
+
+void print_buildids(std::ostream &os);
 
 typedef struct user_regs_struct user_context;
 

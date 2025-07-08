@@ -428,7 +428,9 @@ void profiler_main_thread()
     pid_t tid = syscall(SYS_gettid);
     pthread_atfork(NULL, NULL, update_pid);
     std::this_thread::sleep_for(std::chrono::milliseconds(30000));
-    get_mmap(pid, buffer_manager->output_file);
+    get_mmap(pid);
+    print_mmap(pid, buffer_manager->output_file);
+    print_buildids(buffer_manager->buildid_file);
     int i = 0;
     while (i++ < 1000000)
     { 
@@ -473,7 +475,7 @@ __attribute__((constructor)) void preload_main()
 {
     initLogFile();
     executable_segments = new ExecutableSegments(true);
-    buffer_manager = new BufferManager(MAX_THREAD_NUM, "perf_data.br"); 
+    buffer_manager = new BufferManager(MAX_THREAD_NUM, "perf_data.br", "buildid-list.txt"); 
     // register handler of SIGIO for all threads
     {
         struct sigaction sa;
