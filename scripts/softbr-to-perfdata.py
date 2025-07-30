@@ -18,7 +18,7 @@ g_pid = 0
 def parse_perf_script(input_file):
     brstack_pattern = re.compile(r"\s*((?:0x[0-9a-f]+/0x[0-9a-f]+/[pm-]/[x-]/[a-]/[0-9]+\s*)+)$")
     mmap_pattern = re.compile(r"(PERF_RECORD_MMAP) (-?\d+)/(\d+): \[(0x[0-9a-f]+)\((0x[0-9a-f]+)\) @ ((?:0x)*[0-9a-f]+)\]: ([rx]) (.*)")
-    mmap2_pattern = re.compile(r"(PERF_RECORD_MMAP2) (-?\d+)/(\d+): \[(0x[0-9a-f]+)\((0x[0-9a-f]+)\) @ ((?:0x)*[0-9a-f]+) ([0-9a-f]{2}):([0-9a-f]{2}) (\d+) (\d+)\]: ([r-])([w-])([x-])([sp]) (.*)")
+    mmap2_pattern = re.compile(r"(PERF_RECORD_MMAP2) (-?\d+)/(\d+): \[(0x[0-9a-f]+)\((0x[0-9a-f]+)\) @ ((?:0x)*[0-9a-f]+) ([0-9a-f]+):([0-9a-f]+) (\d+) (\d+)\]: ([r-])([w-])([x-])([sp]) (.*)")
     pid_pattern = re.compile("^\d+$")
     callchain_pattern = re.compile("^\s*[0-9a-f]+$")
 
