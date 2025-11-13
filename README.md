@@ -21,7 +21,7 @@ mv DynamoRIO-AArch64-Linux-10.0.0 DynamoRIO
 
 
 ## Compile
-you should use BiSheng compiler to compile profiler.
+you should use BiSheng compiler to compile softbr.
 ```
 export CC=/bisheng/bin/clang
 export CXX=/bisheng/bin/clang++
@@ -31,9 +31,9 @@ cmake .. && make -j
 ```
 ## How to run
 There are 2 ways to use BR:
-1. use the profiler with `LD_PRELOAD`
+1. use the softbr with `LD_PRELOAD`
 
-2. Directly link the libprofiler.so to your program.just like `-lprofiler`
+2. Directly link the libsoftbr.so to your program.just like `-lsoftbr`
 
 ## profile file
 
