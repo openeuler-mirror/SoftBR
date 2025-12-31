@@ -50,3 +50,11 @@ PERF_RECORD_MMP2 XXX
             aaaaaadc98ac
  0xaaaaaad5e0f0/0xaaaaaad5e0b0/p/-/-/1 ...  0xaaaaaad5e0f0/0xaaaaaad5e0b0/p/-/-/1   // branch record
  ```
+
+## How to Convert `perf_data.br` to `perf.data`
+
+To convert the file `perf_data.br` to the binary `perf.data` format, use the script `scripts/softbr-to-perfdata.py`. The resulting `perf.data` file can be used with tools such as `BOLT`, `AutoFDO`, and `propeller`.
+
+```bash
+/path/to/softbr/scripts/softbr-to-perfdata.py perf_data.br -b buildid-list.txt -o perf.data
+```
